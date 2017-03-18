@@ -6,15 +6,17 @@ app.controller('DemoCtrl', ['$scope', '$filter', '$http', 'State', function($sco
     var today = new Date();
     today.setHours(0);
     today.setMinutes(0);
-    $scope.getDate = function(row, col, index) {
-        // console.log('calendar', row, col, index);
-        var adate = new Date(today.getTime());
-        adate.setDate(adate.getDate() + col);
-        if (row === 0) {
-            return $filter('date')(adate, 'EEE d MMM yy');
-        } else {
-            adate.setMinutes(row * 5);
-            return $filter('date')(adate, 'hh:mm');
+    $scope.getDate = function(index, row, col) {
+        if (index !== undefined) {
+            // console.log('calendar', row, col, index);
+            var adate = new Date(today.getTime());
+            adate.setDate(adate.getDate() + col);
+            if (row === 0) {
+                return $filter('date')(adate, 'EEE d MMM yy');
+            } else {
+                adate.setMinutes(row * 5);
+                return $filter('date')(adate, 'hh:mm');
+            }
         }
     }
 

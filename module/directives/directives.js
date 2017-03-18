@@ -6,6 +6,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
         return string.replace(/^\s+|\s+$/gm, '');
     }
     return {
+        priority: 1, 
         restrict: 'A',
         replace: true,
         scope: {
@@ -21,24 +22,30 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                     // trim whitespaces
                     return (native.nodeType !== 3 || /\S/.test(native.nodeValue));
                 }).map(function(native) {
-                    return native.outerHTML;
+                    var html = native.outerHTML;
+                    /*
+                    if (native && native.parentNode) {
+                        native.parentNode.removeChild(native);
+                    }
+                    */
+                    return html;
                 });
                 htmls = htmls.join('');
                 var element = angular.element('<div>' + htmls + '</div>');
                 var native = element[0];
                 var nativeRow = native.querySelector('.ngrid-row');
-                var nativeCol = native.querySelector('.ngrid-col');
-                var nativeCell = native.querySelector('.ngrid-cell');
                 if (nativeRow && nativeRow.parentNode) {
                     nativeRow.parentNode.removeChild(nativeRow);
                     $attrs.templateRow = trimWhiteSpace(nativeRow.outerHTML);
                     // console.log($attrs.templateRow);
                 }
+                var nativeCol = native.querySelector('.ngrid-col');
                 if (nativeCol && nativeCol.parentNode) {
                     nativeCol.parentNode.removeChild(nativeCol);
                     $attrs.templateCol = trimWhiteSpace(nativeCol.outerHTML);
                     // console.log($attrs.templateCol);
                 }
+                var nativeCell = native.querySelector('.ngrid-cell');
                 if (nativeCell && nativeCell.parentNode) {
                     nativeCell.parentNode.removeChild(nativeCell);
                     $attrs.templateCell = trimWhiteSpace(nativeCell.outerHTML);
@@ -117,17 +124,14 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
             }
 
             function updateRows() {
-                var dirty = layout.rows.dirty = false,
-                    from = layout.rows.from,
-                    to = layout.rows.to,
-                    count = layout.rows.count,
-                    total = layout.rows.total;
+                var total = layout.rows.total,
+                    dirty = false, from, to, count;
                 if (total) {
                     count = Math.ceil(layout.grid.height / layout.cell.height) + 1;
                     from = Math.floor(layout.scroll.y / layout.cell.height);
                     from = Math.max(0, Math.min(total - count + 1, from));
                     to = Math.min(rows.length, from + count);
-                    dirty = (from !== layout.rows.from);
+                    dirty = (from !== layout.rows.from) || (to !== layout.rows.to);
                     layout.rows.dirty = dirty;
                     layout.rows.from = from;
                     layout.rows.to = to;
@@ -136,17 +140,14 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
             }
 
             function updateCols() {
-                var dirty = layout.cols.dirty = false,
-                    from = layout.cols.from,
-                    to = layout.cols.to,
-                    count = layout.cols.count,
-                    total = layout.cols.total;
+                var total = layout.cols.total,
+                    dirty = false, from, to, count;
                 if (total) {
                     count = Math.ceil(layout.grid.width / layout.cell.width) + 1;
                     from = Math.floor(layout.scroll.x / layout.cell.width);
                     from = Math.max(0, Math.min(total - count + 1, from));
                     to = Math.min(cols.length, from + count);
-                    dirty = (from !== layout.cols.from);
+                    dirty = (from !== layout.rows.from) || (to !== layout.rows.to);
                     layout.cols.dirty = dirty;
                     layout.cols.from = from;
                     layout.cols.to = to;
@@ -155,7 +156,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
             }
 
             function drawRows() {
-                console.log('drawRows');
+                // console.log('drawRows');
                 var dirty = layout.rows.dirty,
                     from = layout.rows.from,
                     count = layout.rows.count,
@@ -188,7 +189,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
             }
 
             function drawCols() {
-                console.log('drawCols');
+                // console.log('drawCols');
                 var dirty = layout.cols.dirty,
                     from = layout.cols.from,
                     count = layout.cols.count,
@@ -221,16 +222,16 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
             }
 
             function drawCells() {
-                console.log('drawCells');
+                // console.log('drawCells');
                 var count = layout.rows.count * layout.cols.count,
                     visibles = layout.visibles,
                     template = templateCell,
                     targetElement = tableElement;
                 if (layout.rows.dirty || layout.cols.dirty) {
-                    angular.forEach(visibles, function(cell, index) {
-                        if (index < count) {
-                            var r = Math.floor(index / layout.cols.count);
-                            var c = (index % layout.cols.count);
+                    angular.forEach(visibles, function(cell, i) {
+                        if (i < count) {
+                            var r = Math.floor(i / layout.cols.count);
+                            var c = (i % layout.cols.count);
                             var $row = layout.rows.from + r;
                             var $col = layout.cols.from + c;
                             var $index = $row * layout.cols.total + $col;
@@ -242,11 +243,17 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                             cell.scope.$digest();
                         }
                     });
+                    // console.log('dirty', Math.min(visibles.length, count));
                 }
+                /*
+                if (visibles.length < count) {
+                    console.log('compile');
+                }
+                */
                 while (visibles.length < count) {
-                    var index = visibles.length;
-                    var r = Math.floor(index / layout.cols.count);
-                    var c = (index % layout.cols.count);
+                    var i = visibles.length;
+                    var r = Math.floor(i / layout.cols.count);
+                    var c = (i % layout.cols.count);
                     var $row = layout.rows.from + r;
                     var $col = layout.cols.from + c;
                     var $index = $row * layout.cols.total + $col;
@@ -263,7 +270,12 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                     /*
                     var compiled = $interpolate(template, false, null, true)($scope);
                     */
-                    var compiled = $compile(template)($scope);
+                    /**** COMPILE ****/
+                    var compiled = $compile(template)($scope, function(cloned) {
+                        compiled = cloned;
+                        // console.log(cloned[0].outerHTML);
+                    });
+                    /**** COMPILE ****/
                     var $element = angular.element(compiled);
                     var native = $element[0];
                     native.style.width = layout.cell.width + 'px';
@@ -276,11 +288,11 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 }
 
                 var USE_TRANSFORM = true;
-                angular.forEach(visibles, function(cell, index) {
+                angular.forEach(visibles, function(cell, i) {
                     var native = cell.element[0];
-                    if (index < count) {
-                        r = Math.floor(index / layout.cols.count);
-                        c = (index % layout.cols.count);
+                    if (i < count) {
+                        r = Math.floor(i / layout.cols.count);
+                        c = (i % layout.cols.count);
                         if (USE_TRANSFORM) {
                             transform(native, 'translateX(' + (c * layout.cell.width) + 'px) translateY(' + (r * layout.cell.height) + 'px)');
                         } else {
@@ -298,6 +310,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                         }
                     }
                 });
+
             }
 
             function redraw() {
@@ -370,7 +383,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
 
             function onCols() {
                 layout.cols.total = 0;
-                layout.table.height = 0;
+                layout.table.width = 0;
                 if (cols) {
                     layout.cols.total = cols.length;
                     layout.table.width = layout.cols.total * layout.cell.width;
@@ -379,8 +392,17 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
             }
 
             function onScroll() {
-                layout.scroll.x = nativeInner.scrollLeft;
-                layout.scroll.y = nativeInner.scrollTop;
+                if (rows) {
+                    layout.rows.total = rows.length;
+                    layout.table.height = layout.rows.total * layout.cell.height;
+                }
+                if (cols) {
+                    layout.cols.total = cols.length;
+                    layout.table.width = layout.cols.total * layout.cell.width;
+                }
+                layout.scroll.x = Math.max(0, Math.min((layout.table.width - layout.grid.width), nativeInner.scrollLeft));
+                layout.scroll.y = Math.max(0, Math.min((layout.table.height - layout.grid.height), nativeInner.scrollTop));
+                // console.log(layout.scroll.x, layout.scroll.y, layout.table.width, layout.grid.width);
                 update();
             }
 
