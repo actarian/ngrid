@@ -1,0 +1,19 @@
+{
+  "name": "repotable",
+  "description": "repotable",
+  "main": "repotable.js",
+  "license": "ISC",
+  "homepage": "https://actarian.github.io/repotable/",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "js-xlsx": "^0.8.5",
+    "bootstrap": "v4.0.0-alpha.6"
+  }
+}

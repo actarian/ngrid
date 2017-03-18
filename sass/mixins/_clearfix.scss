@@ -1,0 +1,11 @@
+﻿@mixin clearfix() {
+  &::after {
+    content: "";
+    display: table;
+    clear: both;
+  }
+}
+
+@mixin unselectable() {
+  user-select: none;
+}

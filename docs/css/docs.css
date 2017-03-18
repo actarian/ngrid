@@ -1,0 +1,64 @@
+/********************
+* * * * DOCS * * * *
+*********************/
+body {
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: 0.5px;
+  padding: 50px;
+  background: #112;
+  color: #eee; }
+
+.ngrid {
+  height: calc(100vh - 100px);
+  background: #223; }
+
+.ngrid-inner {
+  height: calc(100vh - 100px - 40px); }
+
+.ngrid-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 40px;
+  line-height: 20px;
+  vertical-align: middle;
+  text-align: center;
+  font-weight: bold;
+  font-size: 11px;
+  overflow: hidden;
+  background: #111;
+  color: #fff; }
+
+.ngrid-row.even {
+  background: #334; }
+
+.ngrid-cell {
+  text-align: center;
+  line-height: 30px;
+  font-size: 9px;
+  border-right: 1px solid #112;
+  border-bottom: 1px solid #112; }
+  .ngrid-cell.even {
+    background: #334; }
+
+::-webkit-scrollbar-track {
+  border-radius: 0;
+  background-color: transarent;
+  -webkit-box-shadow: none; }
+
+::-webkit-scrollbar {
+  border-radius: 0;
+  width: 10px;
+  height: 10px;
+  background-color: transarent; }
+
+::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  background-color: #88e; }
+
+::-webkit-scrollbar-thumb:window-inactive {
+  border-radius: 0;
+  background: #88e; }

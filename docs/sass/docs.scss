@@ -1,0 +1,90 @@
+/********************
+* * * * DOCS * * * *
+*********************/
+
+@import "./bower_components/bootstrap/scss/mixins";
+@import "./bower_components/bootstrap/scss/variables";
+@import "./sass/mixins";
+
+$body: #112;
+$color: #eee;
+$table: #223;
+$even: #334;
+$info: #fff;
+$thumb: #88e;
+$row-height: 40px;
+
+body {
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 20px;
+    letter-spacing: 0.5px;
+    padding: 50px;
+    background: $body;
+    color: $color;
+}
+
+.ngrid {
+    height: calc(100vh - 100px);
+    background: $table;
+}
+
+.ngrid-inner {
+    height: calc(100vh - 100px - 40px);
+}
+
+.ngrid-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 40px;
+    line-height: 20px;
+    vertical-align: middle;
+    text-align: center;
+    font-weight: bold;
+    font-size: 11px;
+    overflow: hidden;
+    background: #111;
+    color: $info;
+}
+
+.ngrid-row {
+    &.even {
+        background: $even;
+    }
+}
+
+.ngrid-cell {
+    text-align: center;
+    line-height: 30px;
+    font-size: 9px;
+    border-right: 1px solid #112;
+    border-bottom: 1px solid #112;
+    &.even {
+        background: $even;
+    }
+}
+
+::-webkit-scrollbar-track {
+    border-radius: 0;
+    background-color: transarent;
+    -webkit-box-shadow: none; // inset 0 0 6px rgba(0,0,0,0.3);
+}
+
+ ::-webkit-scrollbar {
+    border-radius: 0;
+    width: 10px;
+    height: 10px;
+    background-color: transarent;
+}
+
+ ::-webkit-scrollbar-thumb {
+    border-radius: 0;
+    background-color: $thumb;
+}
+
+ ::-webkit-scrollbar-thumb:window-inactive {
+    border-radius: 0;
+    background: $thumb;
+}

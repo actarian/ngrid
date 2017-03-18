@@ -1,0 +1,16 @@
+﻿
+@mixin transform($properties) {
+    transform: $properties;
+}
+
+@mixin transform-origin($properties) {
+    transform-origin: $properties;
+}
+
+@mixin perspective($properties) {
+    perspective: $properties;
+}
+
+@mixin perspective-origin($properties) {
+    perspective-origin: $properties;
+}

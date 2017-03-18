@@ -1,0 +1,16 @@
+
+<!-- MAIN -->
+<main>
+        <!-- BUSY -->
+        <div class="busy" ng-if="state.isBusy"></div>
+    
+        <!-- NGRID -->
+        <div ngrid="options" ngrid-cols="cols" ngrid-rows="rows">
+            <div class="ngrid-cell" row-index="{{$row}}" col-index="{{$col}}" ng-class="{ even: ($row % 2 == 0) }">
+                <div class="ngrid-cell-inner" title="{{$index}}">
+                    <span ng-bind="getDate($row, $col, $index)"></span>
+                </div>
+            </div>
+        </div>
+
+</main>

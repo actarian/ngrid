@@ -1,0 +1,21 @@
+﻿
+@mixin transitionfix() {
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
+}
+
+@mixin transition($properties: all, $duration: 250ms, $delay: 0ms, $effect: ease-in-out) {
+    transition-property: $properties;
+    transition-duration: $duration;
+    transition-delay: $delay;
+    transition-timing-function: $effect;
+    transform-style: preserve-3d;
+}
+
+@mixin transition-transform($properties: all, $duration: 250ms, $delay: 0ms, $effect: ease-in-out) {
+    transition-property: transform, $properties;
+    transition-duration: $duration;
+    transition-delay: $delay;
+    transition-timing-function: $effect;
+    transform-style: preserve-3d;
+}
