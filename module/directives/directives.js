@@ -169,7 +169,9 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                             var $index = from + index;
                             item.scope.$index = $index;
                             item.scope.row = rows[index + from];
-                            item.scope.$digest();
+                            if (!item.scope.$$phase) {
+                                item.scope.$digest();
+                            }
                         }
                     });
                 }
@@ -202,7 +204,9 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                             var $index = from + index;
                             item.scope.$index = $index;
                             item.scope.col = cols[index + from];
-                            item.scope.$digest();
+                            if (!item.scope.$$phase) {
+                                item.scope.$digest();
+                            }
                         }
                     });
                 }
@@ -240,7 +244,9 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                             cell.scope.$col = $col;
                             cell.scope.row = rows[$row];
                             cell.scope.col = cols[$col];
-                            cell.scope.$digest();
+                            if (!cell.scope.$$phase) {
+                                cell.scope.$digest();
+                            }
                         }
                     });
                     // console.log('dirty', Math.min(visibles.length, count));

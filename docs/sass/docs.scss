@@ -66,17 +66,18 @@ body {
     }
 }
 
+
+::-webkit-scrollbar {
+    border-radius: 0;
+    width: 0; // 10px;
+    height: 0; // 10px;
+    background-color: transarent;
+}
+
 ::-webkit-scrollbar-track {
     border-radius: 0;
     background-color: transarent;
     -webkit-box-shadow: none; // inset 0 0 6px rgba(0,0,0,0.3);
-}
-
- ::-webkit-scrollbar {
-    border-radius: 0;
-    width: 10px;
-    height: 10px;
-    background-color: transarent;
 }
 
  ::-webkit-scrollbar-thumb {
