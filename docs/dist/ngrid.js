@@ -29,11 +29,11 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
         priority: 1, 
         restrict: 'A',
         replace: true,
+        /*
         scope: {
             options: '=?ngrid',
-            rows: '=?ngridRows',
-            cols: '=?ngridCols',
         },
+        */
         templateUrl: 'ngrid/partials/ngrid',
         transclude: true,
         controller: ['$transclude', '$attrs', function($transclude, $attrs) {
@@ -196,7 +196,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                     });
                 }
                 while (visibles.length < count) {
-                    var $scope = scope.$parent.$new();
+                    var $scope = scope.$new();
                     var $element = angular.element(template);
                     targetElement.append($element);
                     var $index = from + visibles.length;
@@ -231,7 +231,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                     });
                 }
                 while (visibles.length < count) {
-                    var $scope = scope.$parent.$new();
+                    var $scope = scope.$new();
                     var $element = angular.element(template);
                     targetElement.append($element);
                     var $index = from + visibles.length;
@@ -254,6 +254,11 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 if (layout.rows.dirty || layout.cols.dirty) {
                     angular.forEach(visibles, function(cell, i) {
                         if (i < count) {
+                            var $scope = getCell(i);
+                            if (!$scope.$$phase) {
+                                $scope.$digest();
+                            }
+                            /*
                             var r = Math.floor(i / layout.cols.count);
                             var c = (i % layout.cols.count);
                             var $row = layout.rows.from + r;
@@ -267,6 +272,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                             if (!cell.scope.$$phase) {
                                 cell.scope.$digest();
                             }
+                            */
                         }
                     });
                     // console.log('dirty', Math.min(visibles.length, count));
@@ -277,18 +283,21 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 }
                 */
                 while (visibles.length < count) {
+                    var $scope = getCell(visibles.length);
+                    /*
                     var i = visibles.length;
                     var r = Math.floor(i / layout.cols.count);
                     var c = (i % layout.cols.count);
                     var $row = layout.rows.from + r;
                     var $col = layout.cols.from + c;
                     var $index = $row * layout.cols.total + $col;
-                    var $scope = scope.$parent.$new();
+                    var $scope = scope.$new();
                     $scope.$index = $index;
                     $scope.$row = $row;
                     $scope.$col = $col;
                     $scope.row = rows[$row];
                     $scope.col = cols[$col];
+                    */
                     /*
                     var $element = angular.element(template);
                     $compile($element)($scope);
@@ -317,8 +326,8 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 angular.forEach(visibles, function(cell, i) {
                     var native = cell.element[0];
                     if (i < count) {
-                        r = Math.floor(i / layout.cols.count);
-                        c = (i % layout.cols.count);
+                        var r = Math.floor(i / layout.cols.count);
+                        var c = (i % layout.cols.count);
                         if (USE_TRANSFORM) {
                             transform(native, 'translateX(' + (c * layout.cell.width) + 'px) translateY(' + (r * layout.cell.height) + 'px)');
                         } else {
@@ -336,7 +345,24 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                         }
                     }
                 });
+            }
 
+            function getCell(i) {
+                var r = Math.floor(i / layout.cols.count);
+                var c = (i % layout.cols.count);
+                var $row = layout.rows.from + r;
+                var $col = layout.cols.from + c;
+                var $index = $row * layout.cols.total + $col;
+                var $scope = layout.visibles.length > i ? layout.visibles[i].scope : scope.$new();
+                $scope.$i = i;
+                $scope.$r = r;
+                $scope.$c = c;
+                $scope.$index = $index;
+                $scope.$row = $row;
+                $scope.$col = $col;
+                $scope.row = rows[$row];
+                $scope.col = cols[$col];
+                return $scope;
             }
 
             function redraw() {
@@ -438,6 +464,8 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 layout.grid.height = layout.table.height = nativeInner.offsetHeight;
                 update();
             }
+
+            /*
             scope.$watch(function() {
                 return nativeInner.offsetWidth;
             }, function(nval, oval) {
@@ -452,16 +480,26 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                     onResize();
                 }
             });
-            scope.$watch('rows', function(newValue) {
-                if (newValue) {
-                    rows = newValue;
+            */
+
+            console.log('attributes', attributes);
+            attributes.$observe('ngridRows', function(value) {
+                console.log('ngridRows', value);
+            });
+
+            scope.$watchCollection(attributes.ngridRows, function(value) {
+                console.log('ngrid.$watchCollection.ngridRows');
+                if (value) {
+                    rows = value;
                     onRows();
                     onResize();
                 }
             });
-            scope.$watch('cols', function(newValue) {
-                if (newValue) {
-                    cols = newValue;
+
+            scope.$watch(attributes.ngridCols, function(value) {
+                console.log('ngrid.$watchCollection.ngridCols');
+                if (value) {
+                    cols = value;
                     onCols();
                     onResize();
                 }

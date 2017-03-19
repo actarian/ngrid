@@ -1,6 +1,6 @@
 ﻿/* global angular, app */
 
-app.controller('DemoCtrl', ['$scope', '$filter', '$http', 'State', function($scope, $filter, $http, State) {
+app.controller('DemoCtrl', ['$scope', '$filter', '$http', '$timeout', 'State', function($scope, $filter, $http, $timeout, State) {
     var state = $scope.state = new State();
 
     var today = new Date();
@@ -21,7 +21,6 @@ app.controller('DemoCtrl', ['$scope', '$filter', '$http', 'State', function($sco
     }
 
     var options = $scope.options = {};
-
     function serialNumber(number, max) {
         return new Array((1 + (max.toString().length) - (number.toString().length))).join('0');
     }
@@ -60,5 +59,16 @@ app.controller('DemoCtrl', ['$scope', '$filter', '$http', 'State', function($sco
 
     Cols();
     Rows();
+
+    $timeout(function() {
+        var rows = $scope.rows;
+        var id = rows.length + 1;
+        rows.push({
+            $id: id,
+            id: id,
+            // name: 'R' + serialNumber(id, ROWS) + id,
+            name: 'R' + id,
+        });
+    }, 3000);
 
 }]);
