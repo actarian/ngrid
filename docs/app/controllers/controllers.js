@@ -57,9 +57,11 @@ app.controller('DemoCtrl', ['$scope', '$filter', '$http', '$timeout', 'State', f
         $scope.rows = rows;
     }
 
-    Cols();
     Rows();
 
+    Cols();
+
+    /*
     $timeout(function() {
         var rows = $scope.rows;
         var id = rows.length + 1;
@@ -70,5 +72,6 @@ app.controller('DemoCtrl', ['$scope', '$filter', '$http', '$timeout', 'State', f
             name: 'R' + id,
         });
     }, 3000);
+    */
 
 }]);

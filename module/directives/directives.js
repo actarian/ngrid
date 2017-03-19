@@ -10,6 +10,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
         restrict: 'A',
         replace: true,
         /*
+        // with scope attributes watch won't work anymore
         scope: {
             options: '=?ngrid',
         },
@@ -93,96 +94,80 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                         x: 0,
                         y: 0,
                     },
-                    rows: {
-                        dirty: false,
-                        from: -1,
-                        to: 0,
-                        count: 0,
-                        total: 0,
-                        has: attributes.ngridRows !== undefined,
-                    },
-                    cols: {
-                        dirty: false,
-                        from: -1,
-                        to: 0,
-                        count: 0,
-                        total: 0,
-                        has: attributes.ngridCols !== undefined,
-                    },
+                    rows: {},
+                    cols: {},
                     visibles: [],
                 },
                 rows, cols;
-
-            if (angular.isObject(scope.options)) {
-                layout = angular.extend(scope.options, layout);
-            }
-            if (layout.rows.has) {
-                element.addClass('vertical');
-            }
-            if (layout.cols.has) {
-                element.addClass('horizontal');
-            }
-
+          
+            
             function updateRows() {
                 var total = layout.rows.total,
                     dirty = false, from, to, count;
-                if (total) {
+                if (total > 0) {
                     count = Math.ceil(layout.grid.height / layout.cell.height) + 1;
                     from = Math.floor(layout.scroll.y / layout.cell.height);
                     from = Math.max(0, Math.min(total - count + 1, from));
                     to = Math.min(rows.length, from + count);
-                    dirty = (from !== layout.rows.from) || (to !== layout.rows.to);
-                    layout.rows.dirty = dirty;
-                    layout.rows.from = from;
-                    layout.rows.to = to;
-                    layout.rows.count = count;
+                } else {
+                    count = to = 1;
+                    from = 0;
                 }
+                dirty = (from !== layout.rows.from) || (to !== layout.rows.to);
+                layout.rows.dirty = dirty;
+                layout.rows.from = from;
+                layout.rows.to = to;
+                layout.rows.count = count;
             }
 
             function updateCols() {
                 var total = layout.cols.total,
                     dirty = false, from, to, count;
-                if (total) {
+                if (total > 0) {
                     count = Math.ceil(layout.grid.width / layout.cell.width) + 1;
                     from = Math.floor(layout.scroll.x / layout.cell.width);
                     from = Math.max(0, Math.min(total - count + 1, from));
                     to = Math.min(cols.length, from + count);
-                    dirty = (from !== layout.rows.from) || (to !== layout.rows.to);
-                    layout.cols.dirty = dirty;
-                    layout.cols.from = from;
-                    layout.cols.to = to;
-                    layout.cols.count = count;
+                } else {
+                    count = to = 1;
+                    from = 0;
                 }
+                dirty = (from !== layout.cols.from) || (to !== layout.cols.to);
+                layout.cols.dirty = dirty;
+                layout.cols.from = from;
+                layout.cols.to = to;
+                layout.cols.count = count;
             }
 
+            /*
             function drawRows() {
                 // console.log('drawRows');
                 var dirty = layout.rows.dirty,
                     from = layout.rows.from,
                     count = layout.rows.count,
                     visibles = layout.visibles,
-                    template = templateRow,
+                    template = templateCell,
                     targetElement = tableElement;
                 if (dirty) {
-                    angular.forEach(visibles, function(item, index) {
-                        if (index < count) {
-                            var $index = from + index;
-                            item.scope.$index = $index;
-                            item.scope.row = rows[index + from];
-                            if (!item.scope.$$phase) {
-                                item.scope.$digest();
+                    angular.forEach(visibles, function(item, i) {
+                        if (i < count) {
+                            var $scope = getCell(i);
+                            if (!$scope.$$phase) {
+                                $scope.$digest();
                             }
                         }
                     });
                 }
                 while (visibles.length < count) {
-                    var $scope = scope.$new();
-                    var $element = angular.element(template);
+                    var $scope = getCell(visibles.length);
+                    var compiled = $compile(template)($scope, function(cloned) {
+                        compiled = cloned;
+                    });
+                    var $element = angular.element(compiled);
+                    var nativeElement = $element[0];
+                    nativeElement.style.width = '100%';
+                    nativeElement.style.height = layout.cell.height + 'px';
                     targetElement.append($element);
-                    var $index = from + visibles.length;
-                    $scope.$index = $index;
-                    $scope.row = rows[$index];
-                    $compile($element)($scope);
                     visibles.push({
                         element: $element,
                         scope: $scope,
@@ -196,34 +181,35 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                     from = layout.cols.from,
                     count = layout.cols.count,
                     visibles = layout.visibles,
-                    template = templateCol,
+                    template = templateCell,
                     targetElement = tableElement;
                 if (dirty) {
-                    angular.forEach(visibles, function(item, index) {
-                        if (index < count) {
-                            var $index = from + index;
-                            item.scope.$index = $index;
-                            item.scope.col = cols[index + from];
-                            if (!item.scope.$$phase) {
-                                item.scope.$digest();
+                    angular.forEach(visibles, function(item, i) {
+                        if (i < count) {
+                            var $scope = getCell(i);
+                            if (!$scope.$$phase) {
+                                $scope.$digest();
                             }
                         }
                     });
                 }
                 while (visibles.length < count) {
-                    var $scope = scope.$new();
-                    var $element = angular.element(template);
+                    var $scope = getCell(visibles.length);
+                    var compiled = $compile(template)($scope, function(cloned) {
+                        compiled = cloned;
+                    });
+                    var $element = angular.element(compiled);
+                    var nativeElement = $element[0];
+                    nativeElement.style.width = '100%';
+                    nativeElement.style.height = layout.cell.height + 'px';
                     targetElement.append($element);
-                    var $index = from + visibles.length;
-                    $scope.$index = $index;
-                    $scope.col = cols[$index];
-                    $compile($element)($scope);
                     visibles.push({
                         element: $element,
                         scope: $scope,
                     });
                 }
             }
+            */
 
             function drawCells() {
                 // console.log('drawCells');
@@ -292,39 +278,12 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                     });
                     /**** COMPILE ****/
                     var $element = angular.element(compiled);
-                    var native = $element[0];
-                    native.style.width = layout.cell.width + 'px';
-                    native.style.height = layout.cell.height + 'px';
                     targetElement.append($element);
                     visibles.push({
                         element: $element,
                         scope: $scope,
                     });
                 }
-
-                var USE_TRANSFORM = true;
-                angular.forEach(visibles, function(cell, i) {
-                    var native = cell.element[0];
-                    if (i < count) {
-                        var r = Math.floor(i / layout.cols.count);
-                        var c = (i % layout.cols.count);
-                        if (USE_TRANSFORM) {
-                            transform(native, 'translateX(' + (c * layout.cell.width) + 'px) translateY(' + (r * layout.cell.height) + 'px)');
-                        } else {
-                            native.style.left = (c * layout.cell.width) + 'px';
-                            native.style.top = (r * layout.cell.height) + 'px';
-                            native.style.visibility = 'visible';
-                        }
-                    } else {
-                        if (USE_TRANSFORM) {
-                            transform(native, 'translateX(-1000px) translateY(-1000px)');
-                        } else {
-                            native.style.left = '0px';
-                            native.style.top = '0px';
-                            native.style.visibility = 'hidden';
-                        }
-                    }
-                });
             }
 
             function getCell(i) {
@@ -340,9 +299,82 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 $scope.$index = $index;
                 $scope.$row = $row;
                 $scope.$col = $col;
-                $scope.row = rows[$row];
-                $scope.col = cols[$col];
+                $scope.row = rows ? rows[$row] : null;
+                $scope.col = cols ? cols[$col] : null;
                 return $scope;
+            }
+
+            // var updating;
+            function update() {
+                // console.log('update');
+                // if (!updating) {
+                    // updating = true;
+                    updateRows();
+                    updateCols();
+                    drawCells();
+                    /*
+                    if (layout.rows.has && layout.cols.has) {
+                        drawCells();
+                    } else if (layout.rows.has) {
+                        drawRows();
+                    } else if (layout.cols.has) {
+                        drawCols();
+                    }
+                    */
+                    /*
+                    if (layout.rows.count > 1 && layout.cols.has > 1) {
+                        if (rows && cols) {
+                            drawCells();
+                        }
+                    } else if (layout.rows.has > 1) {
+                        if (rows) {
+                            drawRows();
+                        }
+                    } else if (layout.cols.has > 1) {
+                        if (cols) {
+                            drawCols();
+                        }
+                    }
+                    */
+                    render();
+                    redraw();
+                    // updating = false;
+                    /*
+                    setTimeout(function() {            
+                        updating = false;
+                    });
+                    */
+                // }
+            }
+
+            function render() {
+                var count = layout.rows.count * layout.cols.count,
+                    visibles = layout.visibles;
+                var USE_TRANSFORM = true;
+                angular.forEach(visibles, function(cell, i) {
+                    var nativeElement = cell.element[0];
+                    if (i < count) {
+                        nativeElement.style.width = (cols ? layout.cell.width : layout.table.width) + 'px';
+                        nativeElement.style.height = (rows ? layout.cell.height : layout.table.height) + 'px';
+                        var r = cell.scope.$r;
+                        var c = cell.scope.$c;
+                        if (USE_TRANSFORM) {
+                            transform(nativeElement, 'translateX(' + (c * layout.cell.width) + 'px) translateY(' + (r * layout.cell.height) + 'px)');
+                        } else {
+                            nativeElement.style.left = (c * layout.cell.width) + 'px';
+                            nativeElement.style.top = (r * layout.cell.height) + 'px';
+                            nativeElement.style.visibility = 'visible';
+                        }
+                    } else {
+                        if (USE_TRANSFORM) {
+                            transform(nativeElement, 'translateX(-1000px) translateY(-1000px)');
+                        } else {
+                            nativeElement.style.left = '0px';
+                            nativeElement.style.top = '0px';
+                            nativeElement.style.visibility = 'hidden';
+                        }
+                    }
+                });
             }
 
             function redraw() {
@@ -361,45 +393,12 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 });
             }
 
-            var updating;
-            function update() {
-                if (!updating) {
-                    updating = true;
-                    if (layout.rows.has) {
-                        updateRows();
-                    }
-                    if (layout.cols.has) {
-                        updateCols();
-                    }
-                    if (layout.rows.has && layout.cols.has) {
-                        if (rows && cols) {
-                            drawCells();
-                        }
-                    } else if (layout.rows.has) {
-                        if (rows) {
-                            drawRows();
-                        }
-                    } else if (layout.cols.has) {
-                        if (cols) {
-                            drawCols();
-                        }
-                    }
-                    redraw();
-                    updating = false;
-                    /*
-                    setTimeout(function() {            
-                        updating = false;
-                    });
-                    */
-                }
-            }
-
-            function transform(native, value) {
-                native.style.WebkitTransform =
-                    native.style.MozTransform =
-                    native.style.OTransform =
-                    native.style.MsTransform =
-                    native.style.transform =
+            function transform(node, value) {
+                node.style.WebkitTransform =
+                    node.style.MozTransform =
+                    node.style.OTransform =
+                    node.style.MsTransform =
+                    node.style.transform =
                     value;
             }
 
@@ -409,6 +408,15 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 if (rows) {
                     layout.rows.total = rows.length;
                     layout.table.height = layout.rows.total * layout.cell.height;
+                    layout.rows.has = true;
+                } else {
+                    layout.table.height = layout.grid.height;
+                    layout.rows.has = false;
+                }
+                if (rows && rows.length) {
+                    element.addClass('vertical');
+                } else {
+                    element.removeClass('vertical');
                 }
                 nativeSpacer.style.height = layout.table.height + 'px';
             }
@@ -419,6 +427,15 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 if (cols) {
                     layout.cols.total = cols.length;
                     layout.table.width = layout.cols.total * layout.cell.width;
+                    layout.cols.has = false;
+                } else {
+                    layout.table.width = layout.grid.width;
+                    layout.cols.has = false;
+                }
+                if (cols && cols.length) {
+                    element.addClass('horizontal');
+                } else {
+                    element.removeClass('horizontal');
                 }
                 nativeSpacer.style.width = layout.table.width + 'px';
             }
@@ -462,29 +479,45 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
             });
             */
 
+            /*
+            if (layout.rows.has) {
+                element.addClass('vertical');
+            }
+            if (layout.cols.has) {
+                element.addClass('horizontal');
+            }
+            */
+            /*
             console.log('attributes', attributes);
             attributes.$observe('ngridRows', function(value) {
                 console.log('ngridRows', value);
             });
-
+            */
             scope.$watchCollection(attributes.ngridRows, function(value) {
-                console.log('ngrid.$watchCollection.ngridRows');
-                if (value) {
-                    rows = value;
-                    onRows();
-                    onResize();
-                }
+                // console.log('ngrid.$watchCollection.ngridRows');
+                rows = value;
+                onRows();
+                onResize();
             });
-
             scope.$watch(attributes.ngridCols, function(value) {
-                console.log('ngrid.$watchCollection.ngridCols');
-                if (value) {
-                    cols = value;
-                    onCols();
+                // console.log('ngrid.$watchCollection.ngridCols');
+                cols = value;
+                onCols();
+                onResize();
+            });
+            scope.$watch(attributes.ngrid, function(value) {
+                // console.log('ngrid.$watchCollection.ngrid');
+                if (angular.isObject(value)) {
+                    // ok but add a schema (keys)
+                    angular.extend(layout, value);
                     onResize();
                 }
             });
-
+            /*
+            if (angular.isObject(scope.options)) {
+                layout = angular.extend(scope.options, layout);
+            }
+            */
             /*
             scope.$watch(function(scope) {
                 // watch the 'compile' expression for changes
