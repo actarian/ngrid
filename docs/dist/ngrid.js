@@ -20,107 +20,88 @@ module.constant('ngridModes', {
 
 /* global angular, module */
 
-module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$interpolate', '$compile', '$timeout', 'Utils', function($window, $templateCache, $templateRequest, $interpolate, $compile, $timeout, Utils) {
+module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$interpolate', '$compile', '$filter', '$timeout', 'Utils', function ($window, $templateCache, $templateRequest, $interpolate, $compile, $filter, $timeout, Utils) {
     // polyfill for trim >= IE9
     function trimWhiteSpace(string) {
         return string.replace(/^\s+|\s+$/gm, '');
     }
     return {
-        priority: 1, 
+        priority: 1,
         restrict: 'A',
         replace: true,
         /*
         // with scope attributes watch won't work anymore
-        scope: {
-            options: '=?ngrid',
-        },
+        scope: {},
         */
         templateUrl: 'ngrid/partials/ngrid',
         transclude: true,
-        controller: ['$transclude', '$attrs', function($transclude, $attrs) {
-            $transclude(function(clone, scope) {
-                var htmls = Array.prototype.slice.call(clone).filter(function(native) {
-                    // trim whitespaces
-                    return (native.nodeType !== 3 || /\S/.test(native.nodeValue));
-                }).map(function(native) {
-                    var html = native.outerHTML;
-                    /*
-                    if (native && native.parentNode) {
-                        native.parentNode.removeChild(native);
-                    }
-                    */
-                    return html;
+        controller: ['$transclude', '$attrs', function ($transclude, $attrs) {
+            $transclude(function (clone, scope) {
+                var html = Array.prototype.slice.call(clone).filter(function (node) {
+                    // remove empty text nodes
+                    return (node.nodeType !== 3 || /\S/.test(node.nodeValue));
+                }).map(function (node) {
+                    return trimWhiteSpace(node.outerHTML);
                 });
-                htmls = htmls.join('');
-                var element = angular.element('<div>' + htmls + '</div>');
-                var native = element[0];
-                var nativeRow = native.querySelector('.ngrid-row');
-                if (nativeRow && nativeRow.parentNode) {
-                    nativeRow.parentNode.removeChild(nativeRow);
-                    $attrs.templateRow = trimWhiteSpace(nativeRow.outerHTML);
-                    // console.log($attrs.templateRow);
-                }
-                var nativeCol = native.querySelector('.ngrid-col');
-                if (nativeCol && nativeCol.parentNode) {
-                    nativeCol.parentNode.removeChild(nativeCol);
-                    $attrs.templateCol = trimWhiteSpace(nativeCol.outerHTML);
-                    // console.log($attrs.templateCol);
-                }
-                var nativeCell = native.querySelector('.ngrid-cell');
-                if (nativeCell && nativeCell.parentNode) {
-                    nativeCell.parentNode.removeChild(nativeCell);
-                    $attrs.templateCell = trimWhiteSpace(nativeCell.outerHTML);
-                    // console.log($attrs.templateCell);
-                }
+                html = html.join('');
+                $attrs.template = html;
             });
         }],
-        link: function(scope, element, attributes, model, transclude) {
+        link: function (scope, element, attributes, model, transclude) {
+            var CALENDAR_SIZE = 365;
+            var CALENDAR = attributes.ngridCalendar !== undefined;
+            if (CALENDAR) {
+                element.addClass('calendar');
+            }
+
             // console.log(attributes);
-            var templateRow, templateCol, templateCell;
-            if (attributes.templateRow !== undefined) {
-                templateRow = attributes.templateRow;
-                attributes.templateRow = null;
-            }
-            if (attributes.templateCol !== undefined) {
-                templateCol = attributes.templateCol;
-                attributes.templateCol = null;
-            }
-            if (attributes.templateCell !== undefined) {
-                templateCell = attributes.templateCell;
-                attributes.templateCell = null;
-            }
-            var native = element[0],
-                nativeInner = native.querySelector('.ngrid-inner'),
-                nativeSpacer = native.querySelector('.ngrid-spacer'),
-                nativeTable = native.querySelector('.ngrid-table'),
-                nativeInfo = native.querySelector('.ngrid-info'),
-                tableElement = angular.element(nativeTable),
+            var template = attributes.template;
+            attributes.template = null;
+            // console.log('template', template);
+
+            var templateMonth = '<div class="ngrid-month"><span class="monthName" ng-bind="$monthName"></span> <span class="year" ng-bind="$year"></span></div>';
+            var templateWeek = '<div class="ngrid-week">W <span class="weekName" ng-bind="$weekName"></span></div>';
+            var templateDay = '<div class="ngrid-day" ng-class="{ weekend: $weekEnd }"><span class="dayName" ng-bind="$dayName"></span><span class="day" ng-bind="$day"></span></div>';
+
+            var nodeElement = element[0],
+                nodeHeader = nodeElement.querySelector('.ngrid-header'),
+                nodeHeaderInner = nodeElement.querySelector('.ngrid-header>.ngrid-inner'),
+                nodeHeaderMonths = nodeElement.querySelector('.ngrid-header>.ngrid-inner>.ngrid-months'),
+                nodeHeaderWeeks = nodeElement.querySelector('.ngrid-header>.ngrid-inner>.ngrid-weeks'),
+                nodeHeaderDays = nodeElement.querySelector('.ngrid-header>.ngrid-inner>.ngrid-days'),
+                nodeTable = nodeElement.querySelector('.ngrid-table'),
+                nodeTableInner = nodeElement.querySelector('.ngrid-table>.ngrid-inner'),
+                nodeSpacer = nodeElement.querySelector('.ngrid-spacer'),
+                nodeInfo = nodeElement.querySelector('.ngrid-info'),
+                monthsElement = angular.element(nodeHeaderMonths),
+                weeksElement = angular.element(nodeHeaderWeeks),
+                daysElement = angular.element(nodeHeaderDays),
+                tableElement = angular.element(nodeTableInner),
                 layout = scope.layout = {
-                    grid: {
-                        width: 0,
-                        height: 0,
-                    },
-                    table: {
-                        width: 0,
-                        height: 0,
-                        x: 0,
-                        y: 0,
-                    },
+                    grid: { width: 0, height: 0 },
+                    table: { x: 0, y: 0, width: 0, height: 0 },
+                    scroll: { x: 0, y: 0 },
+                    rows: {}, cols: {},
+                    visibleMonths: [], visibleWeeks: [], visibleDays: [], visibles: [],
                     cell: {
-                        width: attributes.width !== undefined ? parseInt(attributes.width) : 100,
-                        height: attributes.height !== undefined ? parseInt(attributes.height) : 30,
+                        width: attributes.cellWidth !== undefined ? parseInt(attributes.cellWidth) : 40,
+                        height: attributes.cellHeight !== undefined ? parseInt(attributes.cellHeight) : 40,
                     },
-                    scroll: {
-                        x: 0,
-                        y: 0,
+                    month: {
+                        width: attributes.monthWidth !== undefined ? parseInt(attributes.monthWidth) : 40,
+                        height: attributes.monthHeight !== undefined ? parseInt(attributes.monthHeight) : 25,
                     },
-                    rows: {},
-                    cols: {},
-                    visibles: [],
+                    week: {
+                        width: attributes.weekWidth !== undefined ? parseInt(attributes.weekWidth) : 40,
+                        height: attributes.weekHeight !== undefined ? parseInt(attributes.weekHeight) : 25,
+                    },
+                    day: {
+                        width: attributes.dayWidth !== undefined ? parseInt(attributes.dayWidth) : 40,
+                        height: attributes.dayHeight !== undefined ? parseInt(attributes.dayHeight) : 40,
+                    }
                 },
-                rows, cols;
-          
-            
+                rows, cols, weeks, months;
+
             function updateRows() {
                 var total = layout.rows.total,
                     dirty = false, from, to, count;
@@ -159,160 +140,13 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 layout.cols.count = count;
             }
 
-            /*
-            function drawRows() {
-                // console.log('drawRows');
-                var dirty = layout.rows.dirty,
-                    from = layout.rows.from,
-                    count = layout.rows.count,
-                    visibles = layout.visibles,
-                    template = templateCell,
-                    targetElement = tableElement;
-                if (dirty) {
-                    angular.forEach(visibles, function(item, i) {
-                        if (i < count) {
-                            var $scope = getCell(i);
-                            if (!$scope.$$phase) {
-                                $scope.$digest();
-                            }
-                        }
-                    });
-                }
-                while (visibles.length < count) {
-                    var $scope = getCell(visibles.length);
-                    var compiled = $compile(template)($scope, function(cloned) {
-                        compiled = cloned;
-                    });
-                    var $element = angular.element(compiled);
-                    var nativeElement = $element[0];
-                    nativeElement.style.width = '100%';
-                    nativeElement.style.height = layout.cell.height + 'px';
-                    targetElement.append($element);
-                    visibles.push({
-                        element: $element,
-                        scope: $scope,
-                    });
-                }
-            }
-
-            function drawCols() {
-                // console.log('drawCols');
-                var dirty = layout.cols.dirty,
-                    from = layout.cols.from,
-                    count = layout.cols.count,
-                    visibles = layout.visibles,
-                    template = templateCell,
-                    targetElement = tableElement;
-                if (dirty) {
-                    angular.forEach(visibles, function(item, i) {
-                        if (i < count) {
-                            var $scope = getCell(i);
-                            if (!$scope.$$phase) {
-                                $scope.$digest();
-                            }
-                        }
-                    });
-                }
-                while (visibles.length < count) {
-                    var $scope = getCell(visibles.length);
-                    var compiled = $compile(template)($scope, function(cloned) {
-                        compiled = cloned;
-                    });
-                    var $element = angular.element(compiled);
-                    var nativeElement = $element[0];
-                    nativeElement.style.width = '100%';
-                    nativeElement.style.height = layout.cell.height + 'px';
-                    targetElement.append($element);
-                    visibles.push({
-                        element: $element,
-                        scope: $scope,
-                    });
-                }
-            }
-            */
-
-            function drawCells() {
-                // console.log('drawCells');
-                var count = layout.rows.count * layout.cols.count,
-                    visibles = layout.visibles,
-                    template = templateCell,
-                    targetElement = tableElement;
-                if (layout.rows.dirty || layout.cols.dirty) {
-                    angular.forEach(visibles, function(cell, i) {
-                        if (i < count) {
-                            var $scope = getCell(i);
-                            if (!$scope.$$phase) {
-                                $scope.$digest();
-                            }
-                            /*
-                            var r = Math.floor(i / layout.cols.count);
-                            var c = (i % layout.cols.count);
-                            var $row = layout.rows.from + r;
-                            var $col = layout.cols.from + c;
-                            var $index = $row * layout.cols.total + $col;
-                            cell.scope.$index = $index;
-                            cell.scope.$row = $row;
-                            cell.scope.$col = $col;
-                            cell.scope.row = rows[$row];
-                            cell.scope.col = cols[$col];
-                            if (!cell.scope.$$phase) {
-                                cell.scope.$digest();
-                            }
-                            */
-                        }
-                    });
-                    // console.log('dirty', Math.min(visibles.length, count));
-                }
-                /*
-                if (visibles.length < count) {
-                    console.log('compile');
-                }
-                */
-                while (visibles.length < count) {
-                    var $scope = getCell(visibles.length);
-                    /*
-                    var i = visibles.length;
-                    var r = Math.floor(i / layout.cols.count);
-                    var c = (i % layout.cols.count);
-                    var $row = layout.rows.from + r;
-                    var $col = layout.cols.from + c;
-                    var $index = $row * layout.cols.total + $col;
-                    var $scope = scope.$new();
-                    $scope.$index = $index;
-                    $scope.$row = $row;
-                    $scope.$col = $col;
-                    $scope.row = rows[$row];
-                    $scope.col = cols[$col];
-                    */
-                    /*
-                    var $element = angular.element(template);
-                    $compile($element)($scope);
-                    */
-                    /*
-                    var compiled = $interpolate(template, false, null, true)($scope);
-                    */
-                    /**** COMPILE ****/
-                    var compiled = $compile(template)($scope, function(cloned) {
-                        compiled = cloned;
-                        // console.log(cloned[0].outerHTML);
-                    });
-                    /**** COMPILE ****/
-                    var $element = angular.element(compiled);
-                    targetElement.append($element);
-                    visibles.push({
-                        element: $element,
-                        scope: $scope,
-                    });
-                }
-            }
-
-            function getCell(i) {
+            function getCell(i, item) {
                 var r = Math.floor(i / layout.cols.count);
                 var c = (i % layout.cols.count);
                 var $row = layout.rows.from + r;
                 var $col = layout.cols.from + c;
                 var $index = $row * layout.cols.total + $col;
-                var $scope = layout.visibles.length > i ? layout.visibles[i].scope : scope.$new();
+                var $scope = item ? item.scope : scope.$new();
                 $scope.$i = i;
                 $scope.$r = r;
                 $scope.$c = c;
@@ -324,87 +158,301 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 return $scope;
             }
 
-            // var updating;
+            function drawCells() {
+                // console.log('drawCells', template);
+                var count = layout.rows.count * layout.cols.count,
+                    visibles = layout.visibles,
+                    targetElement = tableElement;
+                if (layout.rows.dirty || layout.cols.dirty) {
+                    angular.forEach(visibles, function (item, i) {
+                        if (i < count) {
+                            var $scope = getCell(i, item);
+                            if (!$scope.$$phase) {
+                                $scope.$digest();
+                            }
+                        }
+                    });
+                    // console.log('dirty', Math.min(visibles.length, count));
+                }
+                while (visibles.length < count) {
+                    var $scope = getCell(visibles.length);
+                    var compiled = $compile(template)($scope, function (cloned) {
+                        compiled = cloned;
+                    });
+                    var $element = angular.element(compiled);
+                    targetElement.append($element);
+                    visibles.push({
+                        element: $element,
+                        scope: $scope,
+                    });
+                }
+            }
+
+            var today = new Date();
+            today.setHours(0);
+            today.setMinutes(0);
+            today.setSeconds(0);
+            var offset = today.getTimezoneOffset() * 60 * 1000;
+            var oneday = 24 * 60 * 60 * 1000;
+            function getDate(col) {
+                if (col !== undefined) {
+                    var adate = new Date(today.getTime());
+                    adate.setDate(adate.getDate() - CALENDAR_SIZE + col);
+                    return adate;
+                }
+            }
+
+            function getDay(i, item) {
+                var $c = i;
+                var $col = layout.cols.from + $c;
+                var $index = $col;
+                var $scope = item ? item.scope : scope.$new();
+                $scope.$c = $c;
+                $scope.$col = $col;
+                $scope.$index = $index;
+                var adate = getDate($col), day = adate.getDay();
+                $scope.$key = Math.round(adate.getTime() / oneday) * oneday; // + offset;
+                $scope.$date = adate;
+                $scope.$day = $filter('date')(adate, 'd');
+                $scope.$dayName = $filter('date')(adate, 'EEE');
+                $scope.$week = $filter('date')(adate, 'ww');
+                $scope.$workingDay = (day > 0 && day < 6);
+                $scope.$weekEnd = !$scope.$workingDay;
+                $scope.$month = $filter('date')(adate, 'MM');
+                $scope.$monthName = $filter('date')(adate, 'MMM');
+                $scope.$year = $filter('date')(adate, 'yy');
+                return $scope;
+            }
+            
+            function getAbsoluteCol(col) {
+                // console.log('getAbsoluteCol', col);
+                var i = col - layout.cols.from;
+                var item = layout.visibleDays[i];
+                return getDay(i, item);
+            }
+
+            function getWeek(i, week, item) {
+                var $scope = item ? item.scope : scope.$new();                
+                $scope.$week = week.week;
+                $scope.$weekName = week.weekName;
+                $scope.$from = week.from;
+                $scope.$to = week.to;
+                return $scope;
+            }
+
+            function getMonth(i, month, item) {
+                var $scope = item ? item.scope : scope.$new();
+                $scope.$month = month.month;
+                $scope.$monthName = month.monthName;
+                $scope.$year = month.year;
+                $scope.$from = month.from;
+                $scope.$to = month.to;
+                return $scope;
+            }
+
+            function drawHeaders() {
+                // console.log('drawCells', template);
+                if (CALENDAR) {
+                    var count = layout.cols.count,
+                        visibleMonths = layout.visibleMonths,
+                        visibleWeeks = layout.visibleWeeks,
+                        visibleDays = layout.visibleDays;
+                    if (layout.cols.dirty) {
+                        angular.forEach(visibleDays, function (item, i) {
+                            if (i < count) {
+                                var $scope = getDay(i, item);
+                                if (!$scope.$$phase) {
+                                    $scope.$digest();
+                                }
+                            }
+                        });
+                        // console.log('dirty', Math.min(visibles.length, count));
+                    }
+                    while (visibleDays.length < count) {
+                        var $scope = getDay(visibleDays.length);
+                        var compiled = $compile(templateDay)($scope, function (cloned) {
+                            compiled = cloned;
+                        });
+                        var $element = angular.element(compiled);
+                        daysElement.append($element);
+                        visibleDays.push({
+                            element: $element,
+                            scope: $scope,
+                        });
+                    }
+                    weeks = [];
+                    months = [];
+                    var lastWeek = null, lastMonth = null;
+                    angular.forEach(visibleDays, function (day, i) {
+                        if (i < count) {
+                            var week = parseInt(day.scope.$week);
+                            if (week !== lastWeek) {
+                                if (weeks.length) {
+                                    weeks[weeks.length - 1].to = i;
+                                }
+                                weeks.push({
+                                    week: week,
+                                    weekName: day.scope.$week,
+                                    from: i,
+                                    to: i,
+                                });
+                                lastWeek = week;
+                            }
+                            var month = parseInt(day.scope.$month);
+                            if (month !== lastMonth) {
+                                if (months.length) {
+                                    months[months.length - 1].to = i;
+                                }
+                                months.push({
+                                    month: month,
+                                    monthName: day.scope.$monthName,
+                                    year: day.scope.$year,
+                                    from: i,
+                                    to: i,
+                                });
+                                lastMonth = month;
+                            }
+                        }
+                    });
+                    if (weeks.length > 0) {
+                        weeks[weeks.length - 1].to = count;
+                    }
+                    if (months.length > 0) {
+                        months[months.length - 1].to = count;
+                    }
+                    if (layout.cols.dirty) {
+                        angular.forEach(visibleWeeks, function (item, i) {
+                            if (i < weeks.length) {
+                                var $scope = getWeek(i, weeks[i], item);
+                                if (!$scope.$$phase) {
+                                    $scope.$digest();
+                                }
+                            }
+                        });
+                        while (visibleWeeks.length < weeks.length) {
+                            var $scope = getWeek(visibleWeeks.length, weeks[visibleWeeks.length]);
+                            var compiled = $compile(templateWeek)($scope, function (cloned) {
+                                compiled = cloned;
+                            });
+                            var $element = angular.element(compiled);
+                            weeksElement.append($element);
+                            visibleWeeks.push({
+                                element: $element,
+                                scope: $scope,
+                            });
+                        }
+                        angular.forEach(visibleMonths, function (item, i) {
+                            if (i < months.length) {
+                                var $scope = getMonth(i, months[i], item);
+                                if (!$scope.$$phase) {
+                                    $scope.$digest();
+                                }
+                            }
+                        });
+                        while (visibleMonths.length < months.length) {
+                            var $scope = getMonth(visibleMonths.length, months[visibleMonths.length]);
+                            var compiled = $compile(templateMonth)($scope, function (cloned) {
+                                compiled = cloned;
+                            });
+                            var $element = angular.element(compiled);
+                            monthsElement.append($element);
+                            visibleMonths.push({
+                                element: $element,
+                                scope: $scope,
+                            });
+                        }
+                    }
+                }
+            }
+
             function update() {
                 // console.log('update');
-                // if (!updating) {
-                    // updating = true;
-                    updateRows();
-                    updateCols();
-                    drawCells();
-                    /*
-                    if (layout.rows.has && layout.cols.has) {
-                        drawCells();
-                    } else if (layout.rows.has) {
-                        drawRows();
-                    } else if (layout.cols.has) {
-                        drawCols();
-                    }
-                    */
-                    /*
-                    if (layout.rows.count > 1 && layout.cols.has > 1) {
-                        if (rows && cols) {
-                            drawCells();
-                        }
-                    } else if (layout.rows.has > 1) {
-                        if (rows) {
-                            drawRows();
-                        }
-                    } else if (layout.cols.has > 1) {
-                        if (cols) {
-                            drawCols();
-                        }
-                    }
-                    */
-                    render();
-                    redraw();
-                    // updating = false;
-                    /*
-                    setTimeout(function() {            
-                        updating = false;
-                    });
-                    */
-                // }
+                updateRows();
+                updateCols();
+                drawCells();
+                drawHeaders();
+                render();
+                redraw();
             }
 
             function render() {
                 var count = layout.rows.count * layout.cols.count,
                     visibles = layout.visibles;
                 var USE_TRANSFORM = true;
-                angular.forEach(visibles, function(cell, i) {
-                    var nativeElement = cell.element[0];
+                angular.forEach(visibles, function (item, i) {
+                    var node = item.element[0];
                     if (i < count) {
-                        nativeElement.style.width = (cols ? layout.cell.width : layout.table.width) + 'px';
-                        nativeElement.style.height = (rows ? layout.cell.height : layout.table.height) + 'px';
-                        var r = cell.scope.$r;
-                        var c = cell.scope.$c;
+                        node.style.width = (cols ? layout.cell.width : layout.table.width) + 'px';
+                        node.style.height = (rows ? layout.cell.height : layout.table.height) + 'px';
+                        var r = item.scope.$r;
+                        var c = item.scope.$c;
                         if (USE_TRANSFORM) {
-                            transform(nativeElement, 'translateX(' + (c * layout.cell.width) + 'px) translateY(' + (r * layout.cell.height) + 'px)');
+                            transform(node, 'translateX(' + (c * layout.cell.width) + 'px) translateY(' + (r * layout.cell.height) + 'px)');
                         } else {
-                            nativeElement.style.left = (c * layout.cell.width) + 'px';
-                            nativeElement.style.top = (r * layout.cell.height) + 'px';
-                            nativeElement.style.visibility = 'visible';
+                            node.style.left = (c * layout.cell.width) + 'px';
+                            node.style.top = (r * layout.cell.height) + 'px';
+                            node.style.visibility = 'visible';
                         }
                     } else {
                         if (USE_TRANSFORM) {
-                            transform(nativeElement, 'translateX(-1000px) translateY(-1000px)');
+                            transform(node, 'translateX(-1000px) translateY(-1000px)');
                         } else {
-                            nativeElement.style.left = '0px';
-                            nativeElement.style.top = '0px';
-                            nativeElement.style.visibility = 'hidden';
+                            node.style.left = '0px';
+                            node.style.top = '0px';
+                            node.style.visibility = 'hidden';
                         }
                     }
-                });
+                });                
+                if (CALENDAR) {
+                    var mx = 0, wx = 0;
+                    angular.forEach(layout.visibleMonths, function (item, i) {
+                        var node = item.element[0];
+                        var width = Math.max(1, item.scope.$to - item.scope.$from) * layout.day.width;
+                        if (i < months.length) {
+                            node.style.width = width + 'px';
+                            node.style.height = layout.month.height + 'px';
+                            transform(node, 'translateX(' + mx + 'px) translateY(0px)');
+                            mx += width;
+                        } else {
+                            transform(node, 'translateX(-1000px) translateY(-1000px)');
+                        }
+                    });
+                    angular.forEach(layout.visibleWeeks, function (item, i) {
+                        var node = item.element[0];
+                        var width = Math.max(1, item.scope.$to - item.scope.$from) * layout.day.width;
+                        if (i < weeks.length) {
+                            node.style.width = width + 'px';
+                            node.style.height = layout.week.height + 'px';
+                            transform(node, 'translateX(' + wx + 'px) translateY(' + layout.month.height + 'px)');
+                            wx += width;
+                        } else {
+                            transform(node, 'translateX(-1000px) translateY(-1000px)');
+                        }
+                    });
+                    angular.forEach(layout.visibleDays, function (item, i) {
+                        var node = item.element[0];
+                        if (i < layout.cols.count) {
+                            node.style.width = (cols ? layout.day.width : layout.day.width) + 'px';
+                            node.style.height = (rows ? layout.day.height : layout.day.height) + 'px';
+                            var c = item.scope.$c;
+                            transform(node, 'translateX(' + (c * layout.day.width) + 'px) translateY(' + (layout.month.height + layout.week.height) + 'px)');
+                        } else {
+                            transform(node, 'translateX(-1000px) translateY(-1000px)');
+                        }
+                    });
+                }
             }
 
             function redraw() {
-                // var fragment = document.createDocumentFragment();          
-                // var row = document.createElement('div');
-                // fragment.appendChild(row);
-                // nativeTable.appendChild(fragment);
                 layout.table.x = Math.floor(layout.scroll.x / layout.cell.width) * layout.cell.width;
                 layout.table.y = Math.floor(layout.scroll.y / layout.cell.height) * layout.cell.height;
-                transform(nativeTable, 'translateX(' + layout.table.x + 'px) translateY(' + layout.table.y + 'px)');
+                nodeTableInner.style.width = (layout.cols.has ? layout.cell.width * layout.cols.count : layout.grid.width) + 'px';
+                nodeTableInner.style.height = (layout.rows.has ? layout.cell.height * layout.rows.count : layout.grid.height) + 'px';
+                transform(nodeTableInner, 'translateX(' + layout.table.x + 'px) translateY(' + layout.table.y + 'px)');
+                if (CALENDAR) {
+                    var headerX = layout.table.x - layout.scroll.x;
+                    transform(nodeHeaderInner, 'translateX(' + headerX + 'px)');
+                }
                 log({
                     scroll: layout.scroll,
                     grid: layout.grid,
@@ -438,7 +486,7 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 } else {
                     element.removeClass('vertical');
                 }
-                nativeSpacer.style.height = layout.table.height + 'px';
+                nodeSpacer.style.height = layout.table.height + 'px';
             }
 
             function onCols() {
@@ -457,114 +505,84 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 } else {
                     element.removeClass('horizontal');
                 }
-                nativeSpacer.style.width = layout.table.width + 'px';
+                nodeSpacer.style.width = layout.table.width + 'px';
             }
 
-            function onScroll() {
+            function scrollToColumn(col) {
+                resize();
+                nodeTable.scrollLeft = (col * layout.cell.width);
+                // console.log('scrollToColumn', (layout.table.width - layout.grid.width), nodeTable.scrollLeft);
+                doScroll();
+            }
+
+            function scrollToX(x) {
+                nodeTable.scrollLeft = x;
+                // console.log('scrollTo');
+                doScroll();
+            }
+            function scrollToY(y) {
+                nodeTable.scrollTop = y;
+                // console.log('scrollTo');
+                doScroll();
+            }
+            function scrollTo($layout) {
+                nodeTable.scrollLeft = $layout.scroll.x;
+                nodeTable.scrollTop = $layout.scroll.y;
+                // console.log('scrollTo');
+                doScroll();
+            }
+
+            function doScroll() {
                 if (rows) {
                     layout.rows.total = rows.length;
                     layout.table.height = layout.rows.total * layout.cell.height;
+                } else {
+                    layout.table.height = layout.grid.height;
                 }
                 if (cols) {
                     layout.cols.total = cols.length;
                     layout.table.width = layout.cols.total * layout.cell.width;
+                } else {
+                    layout.table.width = layout.grid.width;
                 }
-                layout.scroll.x = Math.max(0, Math.min((layout.table.width - layout.grid.width), nativeInner.scrollLeft));
-                layout.scroll.y = Math.max(0, Math.min((layout.table.height - layout.grid.height), nativeInner.scrollTop));
+                layout.scroll.x = Math.max(0, Math.min((layout.table.width - layout.grid.width), nodeTable.scrollLeft));
+                layout.scroll.y = Math.max(0, Math.min((layout.table.height - layout.grid.height), nodeTable.scrollTop));
                 // console.log(layout.scroll.x, layout.scroll.y, layout.table.width, layout.grid.width);
+                // console.log('doScroll', (layout.table.width - layout.grid.width), nodeTable.scrollLeft);
                 update();
             }
 
+            function onScroll() {
+                doScroll();
+                // console.log('ngrid.doScroll');
+                if (angular.isFunction(layout.onScroll)) {
+                    layout.onScroll(layout);
+                }
+            }
+
+            function resize() {
+                var WW = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+                var WH = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+                layout.grid.width = layout.table.width = Math.min(nodeTable.offsetWidth, WW);
+                layout.grid.height = layout.table.height = Math.min(nodeTable.offsetHeight, WH);
+            }
             // resize fires on window resize and on scope update      
             function onResize() {
-                layout.grid.width = layout.table.width = nativeInner.offsetWidth;
-                layout.grid.height = layout.table.height = nativeInner.offsetHeight;
+                resize();
                 update();
             }
-
-            /*
-            scope.$watch(function() {
-                return nativeInner.offsetWidth;
-            }, function(nval, oval) {
-                if (nval !== oval) {
-                    onResize();
-                }
-            });
-            scope.$watch(function() {
-                return nativeInner.offsetHeight;
-            }, function(nval, oval) {
-                if (nval !== oval) {
-                    onResize();
-                }
-            });
-            */
-
-            /*
-            if (layout.rows.has) {
-                element.addClass('vertical');
-            }
-            if (layout.cols.has) {
-                element.addClass('horizontal');
-            }
-            */
-            /*
-            console.log('attributes', attributes);
-            attributes.$observe('ngridRows', function(value) {
-                console.log('ngridRows', value);
-            });
-            */
-            scope.$watchCollection(attributes.ngridRows, function(value) {
-                // console.log('ngrid.$watchCollection.ngridRows');
-                rows = value;
-                onRows();
-                onResize();
-            });
-            scope.$watch(attributes.ngridCols, function(value) {
-                // console.log('ngrid.$watchCollection.ngridCols');
-                cols = value;
-                onCols();
-                onResize();
-            });
-            scope.$watch(attributes.ngrid, function(value) {
-                // console.log('ngrid.$watchCollection.ngrid');
-                if (angular.isObject(value)) {
-                    // ok but add a schema (keys)
-                    angular.extend(layout, value);
-                    onResize();
-                }
-            });
-            /*
-            if (angular.isObject(scope.options)) {
-                layout = angular.extend(scope.options, layout);
-            }
-            */
-            /*
-            scope.$watch(function(scope) {
-                // watch the 'compile' expression for changes
-                return scope.$eval(attrs.compile);
-            }, function(value) {
-                // when the 'compile' expression changes
-                // assign it into the current DOM
-                element.html(value);
-                // compile the new DOM and link it to the current
-                // scope.
-                // NOTE: we only compile .childNodes so that
-                // we don't get into infinite loop compiling ourselves
-                $compile(element.contents())(scope);
-            });
-            */
 
             function log(obj) {
                 layout.info = JSON.stringify(obj);
-                nativeInfo.innerHTML = layout.info;
+                nodeInfo.innerHTML = layout.info;
             }
 
             var down, move, diff, dragging, sx, sy;
 
             function onStart(e) {
                 down = Utils.getTouch(e);
-                sx = nativeInner.scrollLeft;
-                sy = nativeInner.scrollTop;
+                sx = nodeTable.scrollLeft;
+                sy = nodeTable.scrollTop;
                 addDragListeners();
                 return false;
             }
@@ -577,13 +595,8 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                     element.addClass('dragging');
                 }
                 if (dragging) {
-                    /*
-                    style.transform = 'translateX(' + diff.x + 'px) translateY(' + diff.y + 'px)';
-                    style.set(target);
-                    elementRect.set(nativeElement).offset(diff);
-                    */
-                    nativeInner.scrollLeft = sx - diff.x;
-                    nativeInner.scrollTop = sy - diff.y;
+                    nodeTable.scrollLeft = sx - diff.x;
+                    // nodeTable.scrollTop = sy - diff.y;
                     onScroll();
                 }
                 return false;
@@ -593,10 +606,6 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
                 if (dragging) {
                     dragging = false;
                     element.removeClass('dragging');
-                    /*
-                    style.transform = 'none';
-                    style.set(target);
-                    */
                 }
                 removeDragListeners();
                 return false;
@@ -613,21 +622,66 @@ module.directive('ngrid', ['$window', '$templateCache', '$templateRequest', '$in
             };
 
             function addListeners() {
-                angular.element(nativeInner).on('touchstart mousedown', onStart);
-                angular.element(nativeInner).on('scroll', onScroll);
+                angular.element(nodeHeader).on('touchstart mousedown', onStart);
+                angular.element(nodeTable).on('scroll', onScroll);
                 angular.element($window).on('resize', onResize);
             };
 
             function removeListeners() {
-                angular.element(nativeInner).off('touchstart mousedown', onStart);
-                angular.element(nativeInner).off('scroll', onScroll);
+                angular.element(nodeHeader).off('touchstart mousedown', onStart);
+                angular.element(nodeTable).off('scroll', onScroll);
                 angular.element($window).off('resize', onResize);
             };
-            scope.$on('$destroy', function() {
+            scope.$on('$destroy', function () {
                 removeListeners();
                 removeDragListeners();
             });
             addListeners();
+
+            // WATCH ROWS
+            scope.$watchCollection(attributes.ngridRows, function (value, oldValue) {
+                // console.log('ngrid.$watchCollection.ngridRows');
+                rows = value;
+                onRows();
+                onResize();
+            });
+
+            // WATCH COLS
+            if (CALENDAR) {
+                cols = new Array(CALENDAR_SIZE * 2);
+                onCols();
+                setTimeout(function () {
+                    scrollToColumn(CALENDAR_SIZE);
+                });
+            } else {
+                scope.$watch(attributes.ngridCols, function (value) {
+                    // console.log('ngrid.$watchCollection.ngridCols');
+                    cols = value;
+                    onCols();
+                    onResize();
+                });
+            }
+
+            // WATCH OPTIONS
+            scope.$watch(attributes.ngrid, function (value) {
+                if (angular.isObject(value)) {
+                    // ok but add a schema (keys)
+                    layout.scrollTo = scrollTo;
+                    layout.scrollToX = scrollToX;
+                    layout.scrollToY = scrollToY;
+                    var keys = ['onScroll', 'scrollTo', 'scrollToX', 'scrollToY'];
+                    angular.forEach(keys, function (key) {
+                        layout[key] = value[key] || layout[key];
+                        value[key] = value[key] || layout[key];
+                        if (CALENDAR) {
+                            value.getAbsoluteCol = getAbsoluteCol;
+                        }
+                    });
+                    // angular.extend(layout, value);
+                    onResize();
+                    // console.log('ngrid.$watch.ngrid', layout);
+                }
+            });
         }
     }
 }]);
@@ -1320,10 +1374,18 @@ app.run(["$templateCache", function($templateCache) {
 "use strict";
 
 $templateCache.put("ngrid/partials/ngrid","<div class=\"ngrid\">\n" +
-    "    <div class=\"ngrid-inner\">\n" +
-    "        <div class=\"ngrid-spacer\"></div>\n" +
-    "        <div class=\"ngrid-table\" ng-transclude></div>\n" +
+    "    <div class=\"ngrid-header\">\n" +
+    "        <div class=\"ngrid-inner\">\n" +
+    "            <div class=\"ngrid-months\"></div>\n" +
+    "            <div class=\"ngrid-weeks\"></div>\n" +
+    "            <div class=\"ngrid-days\"></div>\n" +
+    "        </div>\n" +
     "    </div>\n" +
+    "    <div class=\"ngrid-table\">\n" +
+    "        <div class=\"ngrid-spacer\"></div>\n" +
+    "        <div class=\"ngrid-inner\" ng-transclude></div>\n" +
+    "    </div>\n" +
+    "    <div class=\"ngrid-footer\"></div>\n" +
     "    <div class=\"ngrid-info\"></div>\n" +
     "</div>")
 }]);

@@ -1,7 +1,15 @@
 <div class="ngrid">
-    <div class="ngrid-inner">
-        <div class="ngrid-spacer"></div>
-        <div class="ngrid-table" ng-transclude></div>
+    <div class="ngrid-header">
+        <div class="ngrid-inner">
+            <div class="ngrid-months"></div>
+            <div class="ngrid-weeks"></div>
+            <div class="ngrid-days"></div>
+        </div>
     </div>
+    <div class="ngrid-table">
+        <div class="ngrid-spacer"></div>
+        <div class="ngrid-inner" ng-transclude></div>
+    </div>
+    <div class="ngrid-footer"></div>
     <div class="ngrid-info"></div>
 </div>
